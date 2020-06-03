@@ -1,2 +1,2 @@
 # TensorGUI
-A graphical interface for creating neural networks with Keras.
+A graphical interface for creating sequential networks with Keras, developed using tkinter.
