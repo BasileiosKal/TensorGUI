@@ -1,0 +1,83 @@
+{
+  "Input": {
+    "bg": "gray5",
+    "radiobutton_text": "green"
+  },
+  "Widget": {
+    "bg": "gray5",
+    "activebackground": "gray5",
+    "fg": "green",
+    "activeforeground": "green",
+    "highlightbackground": "gray5"
+  },
+  "Label": {
+    "bg": "gray5",
+    "fg": "white"
+  },
+  "Button": {
+    "fg": "white",
+    "bg": "dark green",
+    "highlightbackground": "black",
+    "activebackground": "dark green",
+    "activeforeground": "white"
+  },
+  "Entry": {
+    "bg": "dark slate gray",
+    "fg": "white",
+    "disabledbackground": "dark slate gray",
+    "highlightbackground": "gray5"
+  },
+  "Combobox": {
+    "drop_down": "dark slate gray",
+    "disabled": "dark slate gray",
+    "foreground": "white",
+    "selectBackground": "royal blue"
+  },
+  "Canvas": {
+    "canvas_bg": "gray5",
+    "label": "white",
+    "line": "white",
+    "text": {
+      "fill": "white"
+    },
+    "rectangle_layer": {
+      "fill": "dark slate gray",
+      "activeoutline": "red"
+    },
+    "Conv2D": {
+      "front": "black",
+      "side": "gray1",
+      "lines": "red",
+      "arrow": "white"
+    }
+  },
+  "ModelSummary": {
+    "Frame": {
+      "bg": "gray5"
+    },
+    "Labels": {
+      "bg": "gray5",
+      "fg": "white"
+    }
+  },
+  "TopLevel": {
+    "bg": "gray40",
+    "Labels": {
+      "bg": "gray40",
+      "fg": "white"
+    },
+    "Entry": {
+      "bg": "dark slate gray",
+      "fg": "white",
+      "disabledbackground": "dark slate gray",
+      "highlightbackground": "gray5"
+    },
+    "Radiobutton": {
+      "bg": "gray40",
+      "activebackground": "gray40",
+      "fg": "red",
+      "activeforeground": "red",
+      "highlightbackground": "gray40"
+    }
+  }
+}
