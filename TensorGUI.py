@@ -1,15 +1,15 @@
 import os
 from tkinter import *
-from tkinter import messagebox,filedialog
+from tkinter import messagebox, filedialog
 from tkinter import ttk
-from LayersGUI import DenseLayerWindow, InputLayerWindow, FlattenLayerWindow, ConvConfigureWindow
+from LayersGUI import DenseLayerWindow, FlattenLayerWindow, ConvConfigureWindow
+from InputWindow import InputLayerWindow
 import tensorflow as tf
 from tensorflow import keras
 import json
 from Utils import Combobox_colour_config
 from matplotlib import pyplot as plt
 from matplotlib.backend_bases import key_press_handler
-import copy
 
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -207,20 +207,57 @@ class App:
     The App will draw in the Canvas the layers the input when it is constructed.
 
     """
-    def __init__(self, input_layer, data):
+    def __init__(self):
+        self.ModelSaved = False
+        self.ModelCompiled = False
+        self.SaveModelDirectory = None
+        self.SaveProjectDirectory = None
+        self.CreateNewWindow = False
 
+
+        Input = InputLayerWindow()
+
+        self.Input = Input
         self.Layers = Layers(self)
-        self.Layers.Append(input_layer)
-        self.data = data
+        if not Input.NextPressed:
+            return
 
+        if Input.OpenProject_RadioVar.get() == 0:
+            self.CreateNewWindow = True
+            projectDir = Input.ProjectFilePath
+            self._load_project(direction=projectDir)
+            self.Create()
+            return
+        (train_X, train_Y) = Input.ProjectWindow.data["train"]
+        (test_X, test_Y) = Input.ProjectWindow.data["test"]
+
+        keras_Input = tf.keras.Input(shape=train_X.shape[1:])
+
+        Input_Layer = {"name": "Input",
+                       "type": "Input",
+                       "shape": keras_Input.shape[1:],
+                       "parameters": 0,
+                       "configuration":
+                           {
+                               "shape": keras_Input.shape
+                           },
+                      "keras_layer": keras_Input}
+
+
+        self.Layers.Append(Input_Layer)
+        self.data = Input.ProjectWindow.data
+        self.Create()
+
+    def Create(self):
         App_W = 1200
         App_H = 700
-
         self.root = Tk()
         self.root.geometry(str(App_W)+"x"+str(App_H))
         self.root.columnconfigure(0, weight=1)
         self.root.columnconfigure(1, weight=1)
         self.root.rowconfigure(2, weight=1)
+
+        self.CreateNewWindow = False
 
         # ===== Toolbar ===== #
         # top frame gray5
@@ -238,7 +275,7 @@ class App:
         self.CompileFrame.grid_propagate(0)
         self.CompileFrame.grid(row=1, column=0, columnspan=2, sticky="we")
 
-        # ------- Bottom frame --------- #
+        # # ------- Bottom frame --------- #
         BottomFrame_H = App_H*(1 - (1/16) - (1/11))
         self.BottomFrame = Frame(self.root, bg="black", width=App_W, height=BottomFrame_H)
         self.BottomFrame.columnconfigure(0, weight=1)
@@ -251,7 +288,7 @@ class App:
         self.CanvasFrame = Frame(self.BottomFrame, bg="green", width=CanvasFrame_W, height=CanvasFrame_H)
         self.CanvasFrame.grid(row=0, column=0, sticky=W+E+N+S)
 
-        #     ------> Model summary Frame
+        #    ------> Model summary Frame
         SummaryFrame_W = 200
         SummaryFrame_H = CanvasFrame_H
         self.SummaryFrame = Frame(self.BottomFrame, width=SummaryFrame_W, height=SummaryFrame_H,
@@ -261,7 +298,7 @@ class App:
 
         # Canvas and scrollbar
         self.canvas = Canvas(self.CanvasFrame, width=App_W, height=App_H*(149/176), scrollregion=(0, 0, 20000, 20000),
-                             bg=canvas_colour_config["canvas_bg"])
+                            bg=canvas_colour_config["canvas_bg"])
 
         # Scrollbar for the canvas
         s = Scrollbar(self.CanvasFrame, orient=HORIZONTAL, bg="red")
@@ -318,7 +355,43 @@ class App:
         self.root.config(menu=self.Menubar)
 
         # ----> File drop down menu
-        def _save_model():
+        def _new_model():
+            self.Layers.LayersList = [self.Layers.LayersList[0]]
+            self.model = None
+            from LayersGraphs import paint_layers
+            paint_layers(self.root, self.canvas, self.Layers, self.SummaryFrame)
+
+        def _save_project_as():
+            filename = filedialog.asksaveasfilename()
+
+            try:
+                os.mkdir(filename)
+
+                self.model.save(filename+"/Model.h5")
+
+                with open(filename + "/InputConf.json", "w") as file:
+                    file.write(json.dumps(self.Input.ProjectWindow.Configuration, indent=2))
+                self.SaveProjectDirectory = filename
+
+            except AttributeError:
+                messagebox.showerror("Saving Error", message="You must compile a model before shaving")
+            except OSError:
+                messagebox.showerror(title="Saving Error",
+                                     message="Creation of the directory %s failed" % filename)
+
+        def _save_project():
+            if self.SaveProjectDirectory:
+                try:
+                    self.model.save(self.SaveProjectDirectory + "/Model.h5")
+
+                    with open(self.SaveProjectDirectory + "/InputConf.json", "w") as file:
+                        file.write(json.dumps(self.Input.ProjectWindow.Configuration, indent=2))
+                except AttributeError:
+                    messagebox.showerror("Shaving Error", message="You must compile a model before shaving")
+            else:
+                _save_project_as()
+
+        def _save_model_as():
             if os.path.exists("/"):
                 initial_dir = "/"
             elif os.path.exists("C:"):
@@ -330,7 +403,20 @@ class App:
                                                     filetypes=(("HDF5", "*.h5"),
                                                                ("SavedModel", "*"),
                                                                ("all files", "*")))
-            self.model.save(str(filePath))
+            try:
+                self.model.save(str(filePath))
+                self.SaveModelDirectory = str(filePath)
+            except AttributeError:
+                messagebox.showerror("Shaving Error", message="You must compile a model before shaving")
+
+        def _save_model():
+            if self.SaveModelDirectory:
+                try:
+                    self.model.save(self.SaveModelDirectory)
+                except AttributeError:
+                    messagebox.showerror("Shaving Error", message="You must compile a model before shaving")
+            else:
+                _save_model_as()
 
         def _load_model():
             if os.path.exists("/"):
@@ -340,36 +426,43 @@ class App:
             else:
                 raise ValueError("Unknown file system")
 
-            filePath = filedialog.askopenfilename(initialdir=initial_dir, title="Select file",
+            loading_filePath = filedialog.askopenfilename(initialdir=initial_dir, title="Select file",
                                                     filetypes=(("HDF5", "*.h5"),
                                                                ("SavedModel", "*"),
                                                                ("all files", "*")))
 
-            model = keras.models.load_model(str(filePath))
+            if loading_filePath == ():    # if Cancel is pressed in the askdirectory dialog
+                return
 
-            self.Layers.LayersFromModelConfig(model)
-            self.model = model
+            try:
+                model = keras.models.load_model(str(loading_filePath))
+                self.Layers.LayersFromModelConfig(model)
+                self.model = model
 
-            from LayersGraphs import paint_layers
-            self.canvas.delete("all")
-            paint_layers(self.root, self.canvas, self.Layers, self.SummaryFrame)
-
-
-
+                from LayersGraphs import paint_layers
+                paint_layers(self.root, self.canvas, self.Layers, self.SummaryFrame)
+                self.SaveModelDirectory = str(loading_filePath)
+            except OSError:
+                messagebox.showerror("Loading Model Error", "Model is corrupted or missing")
 
         FileMenu = Menu(self.Menubar, tearoff=0)
-        FileMenu.add_command(label="Save model", command=_save_model)
-        FileMenu.add_command(label="Load Model", command=_load_model)
+        FileMenu.add_command(label="New Model", command=_new_model)
+        FileMenu.add_separator()
+        FileMenu.add_command(label="Save Project...", command=_save_project)
+        FileMenu.add_command(label="Save Project As...", command=_save_project_as)
+        FileMenu.add_command(label="Load Project...", command=self._load_project)
+        FileMenu.add_separator()
+        FileMenu.add_command(label="Save Model...", command=_save_model)
+        FileMenu.add_command(label="Save Model As...", command=_save_model_as)
+        FileMenu.add_command(label="Load Model...", command=_load_model)
         self.Menubar.add_cascade(label="File", menu=FileMenu)
 
         # ----> Run drop down menu
         RunMenu = Menu(self.Menubar, tearoff=0)
-        RunMenu.add_command(label="Save", command=self.save)
+        RunMenu.add_command(label="Train", command=self.train)
         RunMenu.add_command(label="Compile", command=self.compile)
         RunMenu.add_separator()
         RunMenu.add_command(label="Re-initialize", command=self.re_initialize)
-        RunMenu.add_separator()
-        RunMenu.add_command(label="Train", command=self.train)
         self.Menubar.add_cascade(label="Run", menu=RunMenu)
 
         # ----> Add a layer drop down menu
@@ -401,8 +494,6 @@ class App:
                                                     filetypes=(("HDF5", "*.h5"),
                                                                ("TensorFlow Checkpoint", "*.tf"),
                                                                ("all files", "*")))
-
-            print("------------->>>>> File Path: ", filePath[-2:])
             try:
                 self.model.save_weights(str(filePath), save_format="h5")
             except ValueError as error:
@@ -508,6 +599,108 @@ class App:
         # height = self.canvas.winfo_height()
         self.root.mainloop()
 
+    def _load_project(self, direction=None):
+        """
+        Function for loading an existing, previously saved, project.
+        Every project is a file with the saved model and a JSON file
+        witch contains the input data configuration for the project.
+
+        NOTE: The actual input data are not saved in the project file.
+              The JSON file contains the direction of the data in the host
+              machine.
+
+        :param direction: The projects direction. If None a filedialog will be open
+                          and the user will be able to choose the direction of the
+                          project.
+        :return: Nothing
+        """
+        self.Layers.LayersList = []
+
+        if direction is None:
+            filename = filedialog.askdirectory()
+
+            if filename == ():  # if Cancel is pressed in the askdirectory dialog
+                return
+        else:
+            filename = direction
+
+        try:
+            with open(filename + "/InputConf.json") as file:
+                InputConf = json.load(file)
+
+            # Asserting that the Input configuration file has the correct format.
+            # It must be of the form:
+            # {
+            #     "Use_Keras_Data": true or false,
+            #     "Keras_data": {
+            #         "Data_library": for example "boston_housing"
+            #     },
+            #     "Use_npz_Data": true or false,
+            #     "Reshape": {
+            #         "Do_reshape": true or false,
+            #         "Shape": for example "(28, 28, 1)"
+            #     }
+            # }
+
+            assert "Use_Keras_Data" in InputConf.keys()
+            assert "Keras_data" in InputConf.keys()
+            assert "Data_library" in InputConf["Keras_data"].keys()
+            assert "Use_npz_Data" in InputConf.keys()
+            assert "Reshape" in InputConf.keys()
+            assert "Do_reshape" in InputConf["Reshape"].keys()
+            assert "Shape" in InputConf["Reshape"].keys()
+
+            assert InputConf["Use_Keras_Data"] in [True, False]
+            assert InputConf["Keras_data"]["Data_library"] in ["boston_housing", "cifar10", "cifar100",
+                                                               "fashion_mnist", "imdb", "mnist", "reuters", None]
+            assert InputConf["Use_npz_Data"] in [True, False]
+            assert InputConf["Reshape"]["Do_reshape"] in [True, False]
+
+            self.Input.load_the_data(InputConf=InputConf)
+            model = keras.models.load_model(filename + "/Model.h5")
+            self.model = model
+            self.data = self.Input.data
+
+            (trainData_X, trainData_Y) = self.Input.data["train"]
+            (testData_X, testData_Y) = self.Input.data["test"]
+
+            keras_InputLayer = tf.keras.Input(shape=trainData_X.shape[1:])
+
+            Input_layer = {"name": "Input",
+                           "type": "Input",
+                           "shape": keras_InputLayer.shape[1:],
+                           "parameters": 0,
+                           "configuration":
+                               {
+                                   "shape": keras_InputLayer.shape
+                               },
+                           "keras_layer": keras_InputLayer}
+
+            self.Layers.Append(Input_layer)
+            self.Layers.LayersFromModelConfig(model)
+
+            print("====>>>  ", self.CreateNewWindow)
+            if self.CreateNewWindow:
+                # self.root.quit()
+                # self.root.destroy()
+                self.Create()
+
+            from LayersGraphs import paint_layers
+            paint_layers(self.root, self.canvas, self.Layers, self.SummaryFrame)
+
+        except AssertionError:
+            messagebox.showerror(title="Loading Error",
+                                 message="Input configuration files are corrupted or missing")
+        except FileNotFoundError:
+            messagebox.showerror(title="Loading Error",
+                                 message="Some files are corrupted or missing")
+        except KeyError:
+            messagebox.showerror(title="Loading Error",
+                                 message="Input Configuration files are corrupted or missing")
+        except OSError as error:
+            messagebox.showerror(title="Loading Error",
+                                 message="Some files are corrupted or missing.\n" + str(error))
+
     def Add_layer(self):
         AddLayerWindow(self.root, self.canvas, self.Layers, self.SummaryFrame)
 
@@ -546,27 +739,37 @@ class App:
 
             loadingBar.show(epochs, batch_N, train_size)
 
-            print("START COPY W = ", self.Keras_Layers_copy[-1].get_weights()[1])
-            print("START W = ", self.Keras_Layers[-1].get_weights()[1])
-
             results = self.model.fit(train_X, train_Y, epochs=epochs,
                                      batch_size=batch_N,
                                      callbacks=[logging_callback,
                                                 json_logging_callback])
 
-            print("END COPY W = ", self.Keras_Layers_copy[-1].get_weights()[1])
-            print("END W = ", self.Keras_Layers[-1].get_weights()[1])
-
             ResultsWindow().create(self.root, results.history)
 
-        except ValueError as error:
-            # loadingBar.loadingBar_window.destroy()
+        except AttributeError as error:
             try:
                 loadingBar.loadingBar_window.destroy()
             except AttributeError:
                 pass
-            errorWindow = Toplevel(self.root)
-            Label(errorWindow, text=str(error)).pack()
+
+            error_message = "Unknown error: " + str(error)
+            if not hasattr(self, "model"):
+                error_message = "The model must be saved and compiled"
+
+            messagebox.showerror("AttributeError", error_message)
+
+        except ValueError as error:
+            try:
+                loadingBar.loadingBar_window.destroy()
+            except AttributeError:
+                pass
+
+            error_message = "Unknown error"
+            if str(error) == f"invalid literal for int() with base 10: '{str(self.epochsEntry.get())}'":
+                error_message = f"Invalid value for the number of epochs: '{str(self.epochsEntry.get())}'"
+
+            messagebox.showerror("ValueError", error_message)
+
         except RuntimeError as error:
             try:
                 loadingBar.loadingBar_window.destroy()
@@ -574,23 +777,16 @@ class App:
                 pass
             loadingBar.loadingBar_window.destroy()
             errorWindow = Toplevel(self.root)
-            Label(errorWindow, text=str(error)).pack()
-        except AttributeError as error:
-            # loadingBar.loadingBar_window.destroy()
-            try:
-                loadingBar.loadingBar_window.destroy()
-            except AttributeError:
-                pass
-            errorWindow = Toplevel(self.root)
-            Label(errorWindow, text=str(error)).pack()
+            Label(errorWindow, text="RuntimeError"+str(error)).pack()
+
 
         json_logs.close()
 
-    def save(self):
+    def re_initialize(self):
+        self.Layers.Re_initialize()
+
+    def compile(self):
         self.Keras_Layers = self.Layers.get_KerasLayers()
-        self.Keras_Layers_copy = []
-        for layer in self.Keras_Layers:
-            self.Keras_Layers_copy.append(copy.copy(layer))
 
         try:
             self.model = keras.Sequential(self.Keras_Layers)
@@ -599,10 +795,6 @@ class App:
             errorWindow = Toplevel(self.root)
             Label(errorWindow, text=str(error)).pack()
 
-    def re_initialize(self):
-        self.Layers.Re_initialize()
-
-    def compile(self):
         # get the optimizer
         optimizer_str = self.OptCombobox.get()
         optimizer_config = self.OptConfigs[optimizer_str]
@@ -772,27 +964,6 @@ class Layers:
 
 
 
-
-
-
 if __name__ == "__main__":
-    Input = InputLayerWindow()
-
-    (train_X, train_Y) = Input.data["train"]
-    (test_X, test_Y) = Input.data["test"]
-
-    keras_Input = tf.keras.Input(shape=train_X.shape[1:])
-
-    Input_Layer = {"name": "Input",
-                   "type": "Input",
-                   "shape": keras_Input.shape[1:],
-                   "parameters": 0,
-                   "configuration":
-                       {
-                           "shape": keras_Input.shape
-                       },
-                   "keras_layer": keras_Input}
-
-
-    App(Input_Layer, Input.data)
-    # print("END ", Layers)
+    Application = App()
+    # Application.Create()
