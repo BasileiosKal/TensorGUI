@@ -4,7 +4,7 @@ import numpy as np
 import json
 from math import ceil
 from GraphsUtils import paint_rectangle_layer, draw_convolution_layer, scaling
-from LayersGUI import DenseLayerWindow, ConvConfigureWindow
+from LayersGUI import DenseLayerWindow, ConvConfigureWindow, FlattenLayerWindow
 
 
 ActivationFunctions = ["linear", "sigmoid", "tanh", "relu", "softmax"]
@@ -13,6 +13,7 @@ with open("Colours.json") as f:
 
 
 def paint_layers(Root, In_canvas, layers_list, summaryFrame):
+    In_canvas.delete("all")
     y_coordinate = 350
 
     GraphObjects = {"Input": InputGraph,
@@ -84,6 +85,39 @@ class LayerGraphWindow:
     def calculate_parameters(self):
         self.current_layer["parameters"] = 0
 
+    def set_ConfWindow(self, confWindow):
+        self.confWindow = confWindow
+
+    def SetPosition(self):
+        try:
+            layer_index = self.Layers.LayersList.index(self.current_layer)
+            if layer_index == len(self.Layers.LayersList) - 1:  # If the layer is at the end
+                self.confWindow.PosRadiobuttonVar.set(0)
+            else:  # if it is a hidden layer
+                self.confWindow.PosRadiobuttonVar.set(1)
+                self.confWindow.Pos_Combobox.current(layer_index - 1)
+                self.confWindow.Pos_Combobox_active()
+        except AttributeError as err:
+            print(err)
+
+    def reconfigureButtons(self):
+        try:
+            self.confWindow.AddButton.config(text="Save", command=self.Save)
+            self.confWindow.QuitButton.config(text="Cancel")
+        except AttributeError as err:
+            print(err)
+
+    def Save(self):
+        self.Layers.Remove_layer(self.current_layer)
+        self.confWindow.Add()
+        self.confWindow.Window.destroy()
+
+    def delete_layer(self):
+        self.Layers.Remove_layer(self.current_layer)
+        self.canvas.delete("all")
+        paint_layers(self.parent, self.canvas, self.Layers, self.summaryFrame)
+        self.confWindow.Window.destroy()
+
 
 # <<<<<<<<<<<<<<<<<<<<<<< Input Graph Obj >>>>>>>>>>>>>>>>>>>>>>>>>>> #
 class InputGraph(LayerGraphWindow):
@@ -121,8 +155,17 @@ class FlattenLayerGraph(LayerGraphWindow):
         self.current_layer["shape"] = np.prod(prev_layer["shape"])
         print("Flatten shape: ", self.current_layer["shape"])
 
-    def config_window(self):
-        pass
+    def config_window(self, event):
+        self.ConfigWindow = FlattenLayerWindow(self.parent, self.canvas, self.Layers, self.summaryFrame)
+        self.ConfigWindow.Create()
+        self.set_ConfWindow(self.ConfigWindow)
+
+        self.ConfigWindow.NameEntry.insert(END, self.current_layer["name"])
+        self.SetPosition()
+        self.reconfigureButtons()
+
+        Button(self.ConfigWindow.Window, text="Delete", **colourConfig["Button"],
+               command=self.delete_layer).grid(row=5, column=1, sticky=E, pady=(10, 5))
 
 
 # <<<<<<<<<<<<<<<<<<<<<<< Dense Graph Obj >>>>>>>>>>>>>>>>>>>>>>>>>>> #
@@ -167,6 +210,7 @@ class DenseLayerGraph(LayerGraphWindow):
     def config_window(self, event):
         self.ConfigWindow = DenseLayerWindow(self.parent, self.canvas, self.Layers, self.summaryFrame)
         self.ConfigWindow.Create()
+        self.set_ConfWindow(self.ConfigWindow)
         # making the preselected tags
         self.ConfigWindow.NameEntry.insert(END, self.current_layer["name"])
         self.ConfigWindow.SizeEntry.insert(END, self.current_layer["shape"])
@@ -180,29 +224,11 @@ class DenseLayerGraph(LayerGraphWindow):
 
         self.ConfigWindow.RegCompo.current(reg_val_list.index(RegMethod))
 
-        layer_index = self.Layers.LayersList.index(self.current_layer)
-        if layer_index == len(self.Layers.LayersList)-1:  # If the layer is at the end
-            self.ConfigWindow.PosRadiobuttonVar.set(0)
-        else:  # if it is a hidden layer
-            self.ConfigWindow.PosRadiobuttonVar.set(1)
-            self.ConfigWindow.Pos_Combobox.current(layer_index-1)
-            self.ConfigWindow.Pos_Combobox_active()
+        self.SetPosition()
+        self.reconfigureButtons()
 
-        self.ConfigWindow.createButton.configure(text="Shave", command=self.reconfigure)
-        # Button to delete the layer
         Button(self.ConfigWindow.Window, text="Delete", **colourConfig["Button"],
                command=self.delete_layer).grid(row=10, column=1, sticky=W)
-
-    def reconfigure(self):
-        self.Layers.Remove_layer(self.current_layer)
-        self.ConfigWindow.Add()
-        self.ConfigWindow.Window.destroy()
-
-    def delete_layer(self):
-        self.Layers.Remove_layer(self.current_layer)
-        self.canvas.delete("all")
-        paint_layers(self.parent, self.canvas, self.Layers, self.summaryFrame)
-        self.ConfigWindow.Window.destroy()
 
 
 # <<<<<<<<<<<<<<<<<<<<<<< Conv2D Graph Obj >>>>>>>>>>>>>>>>>>>>>>>>>>> #
@@ -292,29 +318,12 @@ class Conv2DGraph(LayerGraphWindow):
         confWindow.Activation_Reg.current(regularizers_values_list.index(activity_regularizer))
 
         # set the position of the layer
-        layer_index = self.Layers.LayersList.index(self.current_layer)
-        if layer_index == len(self.Layers.LayersList) - 1:  # If the layer is at the end
-            self.confWindow.PosRadiobuttonVar.set(0)
-        else:  # if it is a hidden layer
-            self.confWindow.PosRadiobuttonVar.set(1)
-            self.confWindow.Pos_Combobox.current(layer_index-1)
-            self.confWindow.Pos_Combobox_active()
+        self.SetPosition()
 
         # reconfiguring the configure window to save the changes made on the layer
-        confWindow.AddButton.config(text="Save", command=self.Save)
+        self.reconfigureButtons()
 
         # button fir deleting the layer
         Button(confWindow.Bottom_Frame, text="Delete", command=self.delete_layer, **colourConfig["Button"],
                width=4).pack(side=RIGHT, padx=(5, 2))
-
-    def Save(self):
-        self.Layers.Remove_layer(self.current_layer)
-        self.confWindow.Add()
-        self.confWindow.Window.destroy()
-
-    def delete_layer(self):
-        self.Layers.Remove_layer(self.current_layer)
-        self.canvas.delete("all")
-        paint_layers(self.parent, self.canvas, self.Layers, self.summaryFrame)
-        self.confWindow.Window.destroy()
 

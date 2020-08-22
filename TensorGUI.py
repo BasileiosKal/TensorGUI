@@ -4,7 +4,7 @@ from tkinter import messagebox, filedialog
 from tkinter import ttk
 from LayersGUI import DenseLayerWindow, FlattenLayerWindow, ConvConfigureWindow
 from InputWindow import InputLayerWindow
-import tensorflow as tf
+importensorflow as tf
 from tensorflow import keras
 import json
 from Utils import Combobox_colour_config
