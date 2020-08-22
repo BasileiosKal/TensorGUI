@@ -1,7 +1,32 @@
 {
   "Input": {
-    "bg": "gray5",
-    "radiobutton_text": "green"
+    "Frame": {
+      "bg": "gray5"
+    },
+    "Labels": {
+      "bg": "gray5",
+      "fg": "white"
+    },
+    "Entry": {
+      "bg": "dark slate gray",
+      "fg": "white",
+      "disabledbackground": "dark slate gray",
+      "highlightbackground": "gray5"
+    },
+    "Button": {
+      "fg": "white",
+      "bg": "dark green",
+      "highlightbackground": "black",
+      "activebackground": "dark green",
+      "activeforeground": "white"
+    },
+    "Radiobutton": {
+      "bg": "gray5",
+      "fg": "green",
+      "highlightbackground": "gray5",
+      "activebackground": "gray5",
+      "activeforeground": "green"
+    }
   },
   "Widget": {
     "bg": "gray5",
